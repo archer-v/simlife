@@ -25,6 +25,11 @@ var (
 		},
 		"simple":    universe.NewSimpleUniverse,
 		"smallBuff": universe.NewSmallBuffUniverse,
+		"multithreaded": func(o *universe.Options, stateCh chan universe.Status) universe.Universe {
+			//stub
+			//don't ready yet, will panic
+			return nil
+		},
 	}
 )
 
