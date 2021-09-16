@@ -11,8 +11,8 @@
 I don't think that this project can be useful for something except learning. I hope it will useful if you looking for a golang examples of how to:
  - Write console application with UI, pseudo-graphics windows, and resizable layouts
  - Use keyboard and mouse in the console terminal
- - Process a startup parameters including commands and flags
- - Use goroutines to fork computations and use all CPU cores efficiently
+ - Process startup parameters including commands and flags
+ - Use goroutines to utilize all CPU cores efficiently by performing calculations simultaneously in several threads
  - Use channels to synchronize goroutines
 
 Console UI
@@ -26,3 +26,5 @@ Simulation with short console output
 
 Simulation with multithreading mode with 10 workers (2.5 times faster compared with standard mode)
 ![Screenshot from 2021-09-16 16-46-25](https://user-images.githubusercontent.com/41936843/133607067-78a65986-16eb-428e-a236-d58d47556926.png)
+
+I have no free time to do comprehensive code decorating according to all modern practices. Also, there are a few ugly and potentially problematic peaces in this code. Do not use this code in production :-)
