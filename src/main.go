@@ -23,13 +23,9 @@ var (
 		"base": func(o *universe.Options, stateCh chan universe.Status) universe.Universe {
 			return universe.NewBaseUniverse(o, stateCh)
 		},
-		"simple":    universe.NewSimpleUniverse,
-		"smallBuff": universe.NewSmallBuffUniverse,
-		"multithreaded": func(o *universe.Options, stateCh chan universe.Status) universe.Universe {
-			//stub
-			//don't ready yet, will panic
-			return nil
-		},
+		"simple":        universe.NewSimpleUniverse,
+		"smallBuff":     universe.NewSmallBuffUniverse,
+		"multithreaded": universe.NewMultithreadedUniverse,
 	}
 )
 
@@ -64,30 +60,25 @@ func main() {
 	}
 
 	if eo.interactive {
-		v := view.NewViewTerminal()
+		v := view.NewConsoleUI()
 		u.RegisterViewer(v)
 		v.Start()
 		u.Close()
 	} else {
-		fmt.Printf("\"The Life\" game simulation started...\n")
-
-		startTime := time.Now()
+		v := view.NewConsoleOut()
+		u.RegisterViewer(v)
+		v.Start()
 		u.Run()
 		for {
 			st := <-stateCh
 			if st.RunningMode == universe.RUNNING_STATE_FINISHED {
-				totalTime := time.Since(startTime).Round(time.Millisecond)
-				fmt.Printf("Finished, iteration is: %v, total running time: %v\n", st.IterationNum, totalTime)
 				break
-			}
-			if st.RunningMode == universe.RUNNING_STATE_STEP {
-				if st.IterationNum%10 == 0 {
-					fmt.Printf("Finished iterations: %v\n", st.IterationNum)
-				}
 			}
 		}
 		u.Close()
 		close(stateCh)
+		//waiting for all final output printing
+		time.Sleep(time.Millisecond * 200)
 	}
 
 }
@@ -101,23 +92,37 @@ func initOptions() (eo *EnvOptions, uo *universe.Options) {
 	}
 	eo = &EnvOptions{engine: "base"}
 	flaggy.DefaultParser.ShowHelpOnUnexpected = true
+
+	runMode := flaggy.NewSubcommand("run")
+	runMode.Description = "Run simulation with console output"
+
+	uiMode := flaggy.NewSubcommand("ui")
+	uiMode.Description = "Run with console UI"
+
+	flaggy.AttachSubcommand(runMode, 1)
+	flaggy.AttachSubcommand(uiMode, 1)
+
 	flaggy.Int(&uo.Width, "x", "width", "Width of a simulation field")
 	flaggy.Int(&uo.Height, "y", "height", "Height of a simulation field")
 	flaggy.Duration(&uo.Interval, "i", "interval", "Simulation speed (interval between the steps) in format the number with 'ms' suffix, for example 150ms")
 	flaggy.Int(&uo.MaxSteps, "s", "maxSteps", "Limit the simulation to maxSteps")
-	flaggy.Bool(&eo.interactive, "n", "interactive", "Start interactive mode")
 	flaggy.Bool(&eo.randomData, "r", "random", "Settle with random data")
 	flaggy.String(&eo.engine, "e", "engine", "Engine to use ["+strings.Join(engineNames, "|")+"]")
 
 	flaggy.Parse()
+
+	eo.interactive = uiMode.Used
+	if !uiMode.Used && !runMode.Used {
+		flaggy.ShowHelpAndExit("Specify the running mode \"run\" or \"ui\"")
+	}
 
 	_, ok := engines[eo.engine]
 	if !ok {
 		flaggy.ShowHelpAndExit("unknown engine")
 	}
 
-	if !eo.interactive {
-		flaggy.ShowHelp("")
+	if eo.engine == "multithreaded" {
+		fmt.Println("\nTo use multi-threading effectively set \"interval\" value to 0")
 	}
 
 	return
