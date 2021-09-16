@@ -12,9 +12,15 @@ var (
 		"base": func(o *Options, stateCh chan Status) Universe {
 			return NewBaseUniverse(o, stateCh)
 		},
-		"simple":    NewSimpleUniverse,
-		"smallBuff": NewSmallBuffUniverse,
+		"simple":        NewSimpleUniverse,
+		"smallBuff":     NewSmallBuffUniverse,
+		"multithreaded": NewMultithreadedUniverse,
 	}
+)
+
+const (
+	width  = 200
+	height = 200
 )
 
 func universeStep(u Universe, b *testing.B) {
@@ -72,6 +78,8 @@ func newStateCh() chan Status {
 func newUniverseOptions() *Options {
 	o := DefaultUniverseOptions
 	o.Interval = 0
+	o.Width = width
+	o.Height = height
 	return &o
 }
 
@@ -85,7 +93,6 @@ func engineNames() (engineNames []string) {
 }
 
 func Benchmark_Step(b *testing.B) {
-	//b.Skip()
 	for _, e := range engineNames() {
 		b.Run(e, func(b *testing.B) {
 			u := engines[e](newUniverseOptions(), newStateCh())
@@ -95,7 +102,6 @@ func Benchmark_Step(b *testing.B) {
 }
 
 func Benchmark_Universe(b *testing.B) {
-	//b.Skip()
 	for _, e := range engineNames() {
 		b.Run(e, func(b *testing.B) {
 			u := engines[e](newUniverseOptions(), newStateCh())
