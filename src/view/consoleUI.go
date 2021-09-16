@@ -21,22 +21,19 @@ type keyBindings struct {
 }
 
 type ConsoleUI struct {
-	u universe.Universe
-	g *gocui.Gui
-	k []keyBindings
-	/*
-		tProgressSpinner *pterm.SpinnerPrinter
-	*/
+	u          universe.Universe
+	g          *gocui.Gui
+	k          []keyBindings
 	liveFiller string
 	deadFiller string
 }
 
 var (
 	runningStateDescr = map[universe.RunningState]string{
-		universe.RUNNING_STATE_MANUAL:   aurora.Colorize("waiting", aurora.BlueFg).String(),
-		universe.RUNNING_STATE_STEP:     "do the step",
-		universe.RUNNING_STATE_RUN:      aurora.Colorize("running", aurora.CyanFg).String(),
-		universe.RUNNING_STATE_FINISHED: aurora.Colorize("finished", aurora.RedFg).String(),
+		universe.RunningStateManual:   aurora.Colorize("waiting", aurora.BlueFg).String(),
+		universe.RunningStateStep:     "do the step",
+		universe.RunningStateRun:      aurora.Colorize("running", aurora.CyanFg).String(),
+		universe.RunningStateFinished: aurora.Colorize("finished", aurora.RedFg).String(),
 	}
 )
 
@@ -54,7 +51,6 @@ func NewConsoleUI() *ConsoleUI {
 	}
 
 	t.g.Mouse = true
-	//aurora.Green("The field size is larger than the viewing area").BgBlack().String())
 	t.k = []keyBindings{
 		{gocui.KeyCtrlC,
 			"^C",
@@ -108,10 +104,12 @@ func (t *ConsoleUI) initKeyBindings(k []keyBindings) {
 	}
 }
 
+//Register registers the universe object
 func (t *ConsoleUI) Register(u *universe.BaseUniverse) {
 	t.u = u
 }
 
+//Start starts the main UI loop
 func (t *ConsoleUI) Start() {
 	if err := t.g.MainLoop(); err != nil && err != gocui.ErrQuit {
 		log.Panicln(err)
@@ -119,12 +117,14 @@ func (t *ConsoleUI) Start() {
 	t.g.Close()
 }
 
+//Refresh do the display update
 func (t *ConsoleUI) Refresh() {
 	t.renderField(t.u.Area())
 	t.renderConfiguration()
 	t.renderStatus()
 }
 
+//renderField renders the main "battle field" panel
 func (t *ConsoleUI) renderField(a universe.Area) {
 
 	t.g.Update(func(g *gocui.Gui) error {
@@ -162,7 +162,7 @@ func (t *ConsoleUI) renderField(a universe.Area) {
 				if j >= maxW {
 					break
 				}
-				if bool(e) == true {
+				if e {
 					b.WriteString(t.liveFiller)
 				} else {
 					b.WriteString(t.deadFiller)
@@ -174,6 +174,7 @@ func (t *ConsoleUI) renderField(a universe.Area) {
 	})
 }
 
+//renderStatus renders the status panel
 func (t *ConsoleUI) renderStatus() {
 	s := t.u.Status()
 	t.g.Update(func(g *gocui.Gui) error {
@@ -188,6 +189,7 @@ func (t *ConsoleUI) renderStatus() {
 	})
 }
 
+//renderConfiguration renders the configuration panel
 func (t *ConsoleUI) renderConfiguration() {
 	//it needs to call Update when calls from goroutine
 	t.g.Update(func(g *gocui.Gui) error {
@@ -210,10 +212,13 @@ func (t *ConsoleUI) renderConfiguration() {
 	})
 }
 
+//renderProp render the properties to the string with colors
 func (t *ConsoleUI) renderProp(name string, valueformat string, values ...interface{}) string {
 	return fmt.Sprintf(" "+aurora.Colorize(name, aurora.GreenFg).String()+": "+valueformat, values...)
 }
 
+//layout creates the UI layouts (panels) with predefined sizes and positions
+//calls by gocui.Gui.SetManagerFunction, gocui calls the layout function when terminal is resized
 func (t *ConsoleUI) layout(g *gocui.Gui) error {
 
 	maxX, maxY := g.Size()
@@ -289,6 +294,7 @@ func (t *ConsoleUI) layout(g *gocui.Gui) error {
 	return nil
 }
 
+//headerLayout creates the window header with center positioning message
 func (t *ConsoleUI) headerLayout(g *gocui.Gui, height int, text string) (v *gocui.View, err error) {
 	maxX, _ := g.Size()
 	if v, err = g.SetView("header", -1, -1, maxX+1, height); err != nil {
@@ -308,35 +314,42 @@ func (t *ConsoleUI) headerLayout(g *gocui.Gui, height int, text string) (v *gocu
 	return
 }
 
+//cmdQuit calls by gocui key handlers and do the quit
 func (t *ConsoleUI) cmdQuit(_ *gocui.View) error {
 	return gocui.ErrQuit
 }
 
+//cmdNextRound calls by gocui key handler and calls the Next Round command in the Universe
 func (t *ConsoleUI) cmdNextRound(_ *gocui.View) error {
 	t.u.Step()
 	return nil
 }
 
+//cmdRun calls by gocui key handler and calls the Run command in the Universe
 func (t *ConsoleUI) cmdRun(_ *gocui.View) error {
 	t.u.Run()
 	return nil
 }
 
+//cmdStop calls by gocui key handler and calls the Stop command in the Universe
 func (t *ConsoleUI) cmdStop(_ *gocui.View) error {
 	t.u.Stop()
 	return nil
 }
 
+//cmdClear calls by gocui key handler and calls the Clear command in the Universe
 func (t *ConsoleUI) cmdClear(_ *gocui.View) error {
 	t.u.Clear()
 	return nil
 }
 
+//cmdSettleWithRandom calls by gocui key handler and calls the Settle With Random Cells command in the Universe
 func (t *ConsoleUI) cmdSettleWithRandom(_ *gocui.View) error {
 	t.u.SettleWithRandomData()
 	return nil
 }
 
+//cmdMouseClick calls by gocui mouse button is clicked and calls Inverse command fot the cell in the Universe
 func (t *ConsoleUI) cmdMouseClick(v *gocui.View) error {
 	cx, cy := v.Cursor()
 	t.u.InverseCell(cx, cy)

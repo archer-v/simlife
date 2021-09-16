@@ -1,5 +1,6 @@
 package universe
 
+//Universe represent the unified Universal interface
 type Universe interface {
 	Status() Status
 	Options() Options

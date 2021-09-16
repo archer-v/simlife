@@ -18,7 +18,7 @@ func NewConsoleOut() *ConsoleOut {
 
 func (c *ConsoleOut) Refresh() {
 	st := c.u.Status()
-	if st.RunningMode == universe.RUNNING_STATE_FINISHED {
+	if st.RunningMode == universe.RunningStateFinished {
 		totalTime := time.Since(c.startTime).Round(time.Millisecond)
 		resultData := map[string]interface{}{
 			"Last iteration": st.IterationNum,
@@ -27,7 +27,8 @@ func (c *ConsoleOut) Refresh() {
 		}
 		fmt.Println("\nFinished:")
 		c.printHashData(resultData)
-	} else if st.RunningMode == universe.RUNNING_STATE_RUN {
+		fmt.Println("")
+	} else if st.RunningMode == universe.RunningStateRun {
 		if st.IterationNum%10 == 0 {
 			fmt.Printf("  Iterations done: %v\n", st.IterationNum)
 		}

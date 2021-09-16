@@ -12,10 +12,9 @@ type Area struct {
 	Width    int
 	Height   int
 	Entities [][]Cell
-	sync.Mutex
 }
 
-//universe options
+//Options represents the Universe's configurable options
 type Options struct {
 	Width           int
 	Height          int
@@ -25,7 +24,7 @@ type Options struct {
 	Advanced        map[string]interface{} //advanced options (engine specific)
 }
 
-//universe state
+//Status represents the status of the Universe at concrete moment
 type Status struct {
 	IterationNum  int
 	RunningMode   RunningState
@@ -34,53 +33,61 @@ type Status struct {
 	Details       map[string]interface{} //advanced details (engine specific)
 }
 
-//viewer
+//Viewer is the interface to any Viewer - the object who can display simulation data or control the engine
 type Viewer interface {
 	Refresh()
 	Register(u *BaseUniverse)
 	Start()
 }
 
-//universe seeding template
+//Template represent the seeding template which can used to settle the universe with predefined data
 type Template struct {
 	Name        string  //template name
 	Descr       string  //template descr
 	Coordinates [][]int //array of [x,y] coordinates
 }
 
+//The universe running status at the concrete moment
 type RunningState int
 
+//default options
 const (
-	DEF_SIMULATION_INTERVAL = time.Millisecond * 100
-	DEF_MAX_STEPS           = 1000
-	DEF_WIDTH               = 40
-	DEF_HEIGHT              = 15
-	DEF_MAX_SKIPPED_TICKS   = 5
+	DefSimulationInterval = time.Millisecond * 100
+	DefMaxSteps           = 1000
+	DefWidth              = 40
+	DefHeight             = 15
+	DefMaxSkippedTicks    = 5
 )
 
 const (
-	RUNNING_STATE_MANUAL   = 0x0
-	RUNNING_STATE_STEP     = 0x1
-	RUNNING_STATE_RUN      = 0x2
-	RUNNING_STATE_FINISHED = 0x3
+	RunningStateManual   = 0x0
+	RunningStateStep     = 0x1
+	RunningStateRun      = 0x2
+	RunningStateFinished = 0x3
 )
 
 var DefaultUniverseOptions = Options{
-	Width:           DEF_WIDTH,
-	Height:          DEF_HEIGHT,
-	Interval:        DEF_SIMULATION_INTERVAL,
-	MaxSteps:        DEF_MAX_STEPS,
-	MaxSkippedTicks: DEF_MAX_SKIPPED_TICKS,
+	Width:           DefWidth,
+	Height:          DefHeight,
+	Interval:        DefSimulationInterval,
+	MaxSteps:        DefMaxSteps,
+	MaxSkippedTicks: DefMaxSkippedTicks,
 }
 
+//BaseUniverse is the base universe's engine
+//implements Universe interface
+//can be used to create different implementations by redefining nextIteration func
 type BaseUniverse struct {
 	options Options
 	state   struct {
 		Status
 		sync.Mutex
 	}
+	area struct {
+		Area
+		sync.Mutex
+	}
 	stateCh       chan Status
-	area          Area
 	views         []Viewer
 	templates     map[string]Template
 	controlCh     chan func()
@@ -88,6 +95,7 @@ type BaseUniverse struct {
 	nextIteration func() (hasLiveEnitities bool, changed bool)
 }
 
+//NewBaseUniverse creates the BaseUniverse instance
 func NewBaseUniverse(o *Options, stateCh chan Status) *BaseUniverse {
 	if o == nil {
 		o = &DefaultUniverseOptions
@@ -106,19 +114,19 @@ func NewBaseUniverse(o *Options, stateCh chan Status) *BaseUniverse {
 	u.nextIteration = u._nextIteration
 	u.state.Details = make(map[string]interface{})
 
-	u.area = createArea(o.Width, o.Height)
+	u.area.Area = createArea(o.Width, o.Height)
 	u.refreshView()
 	go u.mainLoop()
 	return &u
 }
 
-//add the seeding template
+//AddTemplate adds the seeding template to the internal storage
 //the universe can be populated with this template by call SettleTemplate
 func (u *BaseUniverse) AddTemplate(tmpl Template) {
 	u.templates[tmpl.Name] = tmpl
 }
 
-//settle the universe with data
+//Settle settles the universe with data
 //vc - array of x,y coordinates
 func (u *BaseUniverse) Settle(vc [][]int) {
 	u.area.Lock()
@@ -127,7 +135,7 @@ func (u *BaseUniverse) Settle(vc [][]int) {
 	u.refreshView()
 }
 
-//populate the universe with the seeding template
+//SettleTemplate populates the universe with the seeding template
 func (u *BaseUniverse) SettleTemplate(name string) {
 	tmpl, ok := u.templates[name]
 	if !ok {
@@ -140,9 +148,9 @@ func (u *BaseUniverse) SettleTemplate(name string) {
 	u.refreshView()
 }
 
-//populate the universe with random data
+//SettleWithRandomData populates the universe with random data
 func (u *BaseUniverse) SettleWithRandomData() {
-	if u.state.RunningMode == RUNNING_STATE_MANUAL || u.state.RunningMode == RUNNING_STATE_FINISHED {
+	if u.state.RunningMode == RunningStateManual || u.state.RunningMode == RunningStateFinished {
 		u.controlCh <- u.clear
 		u.controlCh <- func() {
 			u.area.Lock()
@@ -156,7 +164,7 @@ func (u *BaseUniverse) SettleWithRandomData() {
 	}
 }
 
-//inverse the cell state at point x, y
+//InverseCell inverses the cell state at point x, y
 func (u *BaseUniverse) InverseCell(x int, y int) {
 	if x >= u.area.Width || y >= u.area.Height {
 		return
@@ -167,59 +175,62 @@ func (u *BaseUniverse) InverseCell(x int, y int) {
 	u.refreshView()
 }
 
-//register the viewer - the universe will call the viewer when the state is changed
+//RegisterViewer registers the viewer - the universe will call the viewer when the state is changed
 func (u *BaseUniverse) RegisterViewer(v Viewer) {
 	u.views = append(u.views, v)
 	v.Register(u)
 }
 
-//return the channel with the universe's status updates
+//StateCh returns the channel with the universe's status updates
 func (u *BaseUniverse) StateCh() chan Status {
 	return u.stateCh
 }
 
+//Status returns current universe status represented by Status struct
 func (u *BaseUniverse) Status() Status {
 	return u.state.Status
 }
 
+//Status returns current universe configuration represented by Options struct
 func (u *BaseUniverse) Options() Options {
 	return u.options
 }
 
+//Area returns current universe area (field where cells is living)
 func (u *BaseUniverse) Area() Area {
-	return u.area
+	return u.area.Area
 }
 
-//run the universe simulation, returns immediately
+//Run starts the universe simulation, returns immediately
 func (u *BaseUniverse) Run() {
 	u.controlCh <- u.run
 }
 
-//stop the universe sumulation, returns immediately
-//the Status will be written the stateCh on finish
+//Stop stops the universe simulation, returns immediately
+//the Status struct will be written the stateCh on finish
 func (u *BaseUniverse) Stop() {
 	u.controlCh <- u.stop
 }
 
-//do one simulation step, returns immediately
-//the Status will be written to the stateCh on start and on finish
+//Step do one simulation step, returns immediately
+//the Status struct will be written to the stateCh on start and on finish
 func (u *BaseUniverse) Step() {
 	u.controlCh <- u.step
 }
 
-//clear the universe (kill all cells), returns immediately
-//the Status will be written to the stateCh on finish
+//Clear clears the universe (kill all cells and reset all counters), returns immediately
+//the Status struct will be written to the stateCh on finish
 func (u *BaseUniverse) Clear() {
 	u.controlCh <- u.clear
 }
 
-//stop the main loop, close the channels, returns immediately
+//Close stops the main loop, close the channels, returns immediately
 func (u *BaseUniverse) Close() {
 	u.closeCh <- true
 }
 
-//main loop, should start as a gouroutine
-//waiting for command and execute
+//mainLoop - the main cycle, should start as a goroutine
+//waits for command and executes
 func (u *BaseUniverse) mainLoop() {
 	var c = false
 	for !c {
@@ -234,6 +245,7 @@ func (u *BaseUniverse) mainLoop() {
 	close(u.controlCh)
 }
 
+//settle places the Cell at position x,y
 func (u *BaseUniverse) settle(vc [][]int, entity Cell) {
 	for _, v := range vc {
 		if v[0] >= u.area.Width || v[1] >= u.area.Height {
@@ -243,7 +255,7 @@ func (u *BaseUniverse) settle(vc [][]int, entity Cell) {
 	}
 }
 
-//calculate the count of live cells
+//liveCells calculates the count of live cells
 func (u *BaseUniverse) liveCells() int {
 	liveCells := 0
 	u.area.Lock()
@@ -256,6 +268,8 @@ func (u *BaseUniverse) liveCells() int {
 	return liveCells
 }
 
+//switchRunningState switch the state of the universe to RunningState
+//also writes the new state to the stateCh to signal upper control software
 func (u *BaseUniverse) switchRunningState(to RunningState) {
 	u.state.Lock()
 	u.state.RunningMode = to
@@ -266,26 +280,26 @@ func (u *BaseUniverse) switchRunningState(to RunningState) {
 	}
 }
 
-//start the universe simulation
+//run starts the universe simulation
 //simulation will stop on Stop() calling or when the boundary conditions are reached
 func (u *BaseUniverse) run() {
 	go func() {
-		u.switchRunningState(RUNNING_STATE_RUN)
+		u.switchRunningState(RunningStateRun)
 		skipped := 0
 		done := make(chan bool)
 		defer close(done)
 		for {
 			mode := u.state.RunningMode
-			if mode != RUNNING_STATE_RUN && mode != RUNNING_STATE_STEP {
+			if mode != RunningStateRun && mode != RunningStateStep {
 				break
 			}
 			if skipped > u.options.MaxSkippedTicks {
-				u.switchRunningState(RUNNING_STATE_FINISHED)
+				u.switchRunningState(RunningStateFinished)
 				//todo write the warning message
 				break
 			}
 			//skip the tick if the universe is still in the calculation mode
-			if mode != RUNNING_STATE_STEP {
+			if mode != RunningStateStep {
 				skipped = 0
 				u.controlCh <- func() {
 					u.step()
@@ -303,12 +317,14 @@ func (u *BaseUniverse) run() {
 	}()
 }
 
+//stop stops the universe running cycle
 func (u *BaseUniverse) stop() {
-	if u.state.RunningMode == RUNNING_STATE_RUN {
-		u.switchRunningState(RUNNING_STATE_MANUAL)
+	if u.state.RunningMode == RunningStateRun {
+		u.switchRunningState(RunningStateManual)
 	}
 }
 
+//step does the new one state calculation for entire universe
 func (u *BaseUniverse) step() {
 
 	finished := false
@@ -317,7 +333,7 @@ func (u *BaseUniverse) step() {
 	u.state.IterationNum++
 	defer func() {
 		if finished {
-			u.switchRunningState(RUNNING_STATE_FINISHED)
+			u.switchRunningState(RunningStateFinished)
 		} else {
 			u.switchRunningState(rm)
 		}
@@ -328,14 +344,14 @@ func (u *BaseUniverse) step() {
 		finished = true
 		return
 	}
-	u.switchRunningState(RUNNING_STATE_STEP)
+	u.switchRunningState(RunningStateStep)
 	isAlive, changed := u.nextIteration()
 	if !isAlive || !changed {
 		finished = true
 	}
-	return
 }
 
+//clear clears the unvierse data, reset all counters
 func (u *BaseUniverse) clear() {
 	u.state.Lock()
 	u.area.Lock()
@@ -345,15 +361,15 @@ func (u *BaseUniverse) clear() {
 	u.walkArea(func(x int, y int, e Cell) {
 		u.area.Entities[y][x] = false
 	})
-	u.state.RunningMode = RUNNING_STATE_MANUAL
+	u.state.RunningMode = RunningStateManual
 	u.area.Unlock()
 	u.state.Unlock()
-	u.switchRunningState(RUNNING_STATE_MANUAL)
+	u.switchRunningState(RunningStateManual)
 	u.refreshView()
 
 }
 
-//do one simulation cycle
+//_nextIteration does one simulation cycle
 //walking the area and calculating the next state for the each cell
 //the simplest implementation: creates the new area buffer with full size on each call
 //All cells state is calculated to the new buffer and then this buffer is stored to the universe replacing the old one (by replacing the area pointer)
@@ -378,7 +394,7 @@ func (u *BaseUniverse) _nextIteration() (hasLiveEnitities bool, changed bool) {
 	return
 }
 
-//walk the entire area and call the cb function for each cell
+//walkArea walk the entire area and calls the cb function for each cell
 func (u *BaseUniverse) walkArea(cb func(x int, y int, entity Cell)) {
 	for y := range u.area.Entities {
 		for x := range u.area.Entities[y] {
@@ -387,11 +403,11 @@ func (u *BaseUniverse) walkArea(cb func(x int, y int, entity Cell)) {
 	}
 }
 
-//calculate the next state for the cell
+//cellNextState calculates the next state for the cell
 func (u *BaseUniverse) cellNextState(x int, y int) (live bool) {
 	//calculate neighbors
 	liveNeighbours := 0
-	area := u.area
+	area := u.area.Area
 	for i := -1; i < 2; i++ {
 		for j := -1; j < 2; j++ {
 			//skip my position
@@ -423,14 +439,14 @@ func (u *BaseUniverse) cellNextState(x int, y int) (live bool) {
 	return false
 }
 
-//calls Refresh for all registered views
+//refreshView calls Refresh event for all registered views
 func (u *BaseUniverse) refreshView() {
 	for _, v := range u.views {
 		v.Refresh()
 	}
 }
 
-//allocate the area and return the pointer
+//createArea allocate the new area and return the pointer
 func createArea(width int, height int) Area {
 
 	area := Area{Width: width, Height: height, Entities: make([][]Cell, height)}

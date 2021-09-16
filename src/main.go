@@ -48,9 +48,9 @@ func main() {
 
 	u.AddTemplate(
 		universe.Template{
-			"testSample1",
-			"the test sample with 3 stable patterns",
-			testSample,
+			Name:        "testSample1",
+			Descr:       "the test sample with 3 stable patterns",
+			Coordinates: testSample,
 		})
 
 	if eo.randomData {
@@ -71,7 +71,7 @@ func main() {
 		u.Run()
 		for {
 			st := <-stateCh
-			if st.RunningMode == universe.RUNNING_STATE_FINISHED {
+			if st.RunningMode == universe.RunningStateFinished {
 				break
 			}
 		}
@@ -121,7 +121,7 @@ func initOptions() (eo *EnvOptions, uo *universe.Options) {
 		flaggy.ShowHelpAndExit("unknown engine")
 	}
 
-	if eo.engine == "multithreaded" {
+	if eo.engine == "multithreaded" && uo.Interval != 0 {
 		fmt.Println("\nTo use multi-threading effectively set \"interval\" value to 0")
 	}
 

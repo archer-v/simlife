@@ -37,7 +37,7 @@ func universeStep(u Universe, b *testing.B) {
 		u.Step()
 		for {
 			st := <-stateCh
-			if st.RunningMode == RUNNING_STATE_MANUAL {
+			if st.RunningMode == RunningStateManual {
 				break
 			}
 		}
@@ -62,7 +62,7 @@ func universeRun(u Universe, b *testing.B) {
 			//fmt.Printf("waiting iter: %v\n", i)
 			st := <-stateCh
 			//fmt.Printf("got iter: %v, state: %v, live cells: %v\n", i, st.RunningMode, st.LiveCells)
-			if st.RunningMode == RUNNING_STATE_FINISHED {
+			if st.RunningMode == RunningStateFinished {
 				break
 			}
 		}

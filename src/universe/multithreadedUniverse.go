@@ -11,8 +11,8 @@ import (
 */
 
 const (
-	DEF_WORKERS             = 10
-	DEF_MIN_ROWS_PER_WORKER = 3
+	DefWorkers          = 10 //default workers
+	DefMinRowsPerWorker = 3  //minimum rows for one worker
 )
 
 type MultithreadedUniverse struct {
@@ -21,6 +21,7 @@ type MultithreadedUniverse struct {
 	workAreas []workArea
 }
 
+//workArea describe the working area for the worker
 type workArea struct {
 	x1        int
 	y1        int
@@ -31,6 +32,7 @@ type workArea struct {
 	changed   bool
 }
 
+//newWorkArea creates new work area
 func newWorkArea(x1 int, y1 int, x2 int, y2 int) workArea {
 	return workArea{
 		x1,
@@ -48,10 +50,10 @@ func NewMultithreadedUniverse(o *Options, stateCh chan Status) Universe {
 	//redefine the nextIteration
 	mu.BaseUniverse.nextIteration = mu.nextIteration
 
-	mu.workers = DEF_WORKERS
+	mu.workers = DefWorkers
 	linesPerWorker := mu.area.Height / mu.workers
-	if linesPerWorker < DEF_MIN_ROWS_PER_WORKER {
-		linesPerWorker = DEF_MIN_ROWS_PER_WORKER
+	if linesPerWorker < DefMinRowsPerWorker {
+		linesPerWorker = DefMinRowsPerWorker
 	} else if linesPerWorker*mu.workers < mu.area.Height {
 		linesPerWorker++
 	}
@@ -70,6 +72,8 @@ func NewMultithreadedUniverse(o *Options, stateCh chan Status) Universe {
 	return &mu
 }
 
+//nextIteration calcualtes next state for the universe
+//starts goroutines, waiting for finishing and update all related metrics
 func (mu *MultithreadedUniverse) nextIteration() (hasLiveEntities bool, changed bool) {
 	mu.area.Lock()
 	defer mu.area.Unlock()
@@ -96,12 +100,14 @@ func (mu *MultithreadedUniverse) nextIteration() (hasLiveEntities bool, changed 
 	return
 }
 
+//writeArea writes workArea buffer to Universe's area buffer
 func (mu *MultithreadedUniverse) writeArea(wa workArea) {
 	for y := range wa.tmpBuff.Entities {
 		copy(mu.area.Entities[wa.y1+y][wa.x1:wa.x2], wa.tmpBuff.Entities[y])
 	}
 }
 
+//calcArea calculates new states for the cells inside workArea
 func (mu *MultithreadedUniverse) calcArea(wa *workArea) {
 	wa.liveCells = 0
 	wa.changed = false
