@@ -7,6 +7,7 @@ import (
 	"github.com/logrusorgru/aurora"
 	"log"
 	"simlife/src/universe"
+	"sort"
 	"strings"
 	"time"
 )
@@ -39,7 +40,7 @@ var (
 	}
 )
 
-func NewViewTerminal() *ConsoleUI {
+func NewConsoleUI() *ConsoleUI {
 
 	var err error
 	t := ConsoleUI{
@@ -196,6 +197,14 @@ func (t *ConsoleUI) renderConfiguration() {
 			_, _ = fmt.Fprintln(v, t.renderProp("Dimension", "%v x %v", c.Width, c.Height))
 			_, _ = fmt.Fprintln(v, t.renderProp("Interval", "%v", c.Interval))
 			_, _ = fmt.Fprintln(v, t.renderProp("Iterations", "%v steps", c.MaxSteps))
+			propNames := make([]string, 0, len(c.Advanced))
+			for k := range c.Advanced {
+				propNames = append(propNames, k)
+			}
+			sort.Strings(propNames)
+			for _, propName := range propNames {
+				_, _ = fmt.Fprintln(v, t.renderProp(propName, "%v", c.Advanced[propName]))
+			}
 		}
 		return nil
 	})
