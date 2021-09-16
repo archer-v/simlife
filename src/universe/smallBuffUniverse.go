@@ -18,7 +18,8 @@ func NewSmallBuffUniverse(o *Options, stateCh chan Status) Universe {
 	su := SmallBuffUniverse{BaseUniverse: NewBaseUniverse(o, stateCh)}
 	//redefine the nextIteration
 	su.BaseUniverse.nextIteration = su.nextIteration
-	su.tmpBuff = su.createArea(su.area.Width, 2)
+	su.tmpBuff = createArea(su.area.Width, 2)
+	su.options.Advanced["engine"] = "smallBuff"
 	return &su
 }
 
@@ -26,14 +27,13 @@ func (su *SmallBuffUniverse) nextIteration() (hasLiveEnitities bool, changed boo
 	su.area.Lock()
 	defer su.area.Unlock()
 	start := time.Now()
-	liveCellls := 0
+	liveCells := 0
 	for y := range su.area.Entities {
 		for x := range su.area.Entities[y] {
 			nextState := su.cellNextState(x, y)
 			if nextState {
-				liveCellls++
+				liveCells++
 			}
-			hasLiveEnitities = hasLiveEnitities || nextState
 			changed = changed || nextState != bool(su.area.Entities[y][x])
 			su.tmpBuff.Entities[1][x] = Cell(nextState)
 		}
@@ -42,8 +42,9 @@ func (su *SmallBuffUniverse) nextIteration() (hasLiveEnitities bool, changed boo
 		}
 		su.tmpBuff.Entities[0], su.tmpBuff.Entities[1] = su.tmpBuff.Entities[1], su.tmpBuff.Entities[0]
 	}
-	copy(su.area.Entities[su.area.Height-1], su.tmpBuff.Entities[1])
-	su.state.LiveCells = liveCellls
+	copy(su.area.Entities[su.area.Height-1], su.tmpBuff.Entities[0])
+	su.state.LiveCells = liveCells
 	su.state.IterationTime = time.Since(start)
+	hasLiveEnitities = liveCells > 0
 	return
 }

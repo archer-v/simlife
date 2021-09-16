@@ -22,6 +22,7 @@ type Options struct {
 	Interval        time.Duration
 	MaxSteps        int
 	MaxSkippedTicks int
+	Advanced        map[string]interface{} //advanced options (engine specific)
 }
 
 //universe state
@@ -30,6 +31,7 @@ type Status struct {
 	RunningMode   RunningState
 	LiveCells     int
 	IterationTime time.Duration
+	Details       map[string]interface{} //advanced details (engine specific)
 }
 
 //viewer
@@ -90,6 +92,9 @@ func NewBaseUniverse(o *Options, stateCh chan Status) *BaseUniverse {
 	if o == nil {
 		o = &DefaultUniverseOptions
 	}
+	o.Advanced = make(map[string]interface{})
+	o.Advanced["engine"] = "base"
+
 	u := BaseUniverse{
 		options:   *o,
 		controlCh: make(chan func(), 1),
@@ -99,8 +104,9 @@ func NewBaseUniverse(o *Options, stateCh chan Status) *BaseUniverse {
 	}
 	//nextIteration can be implemented by successor
 	u.nextIteration = u._nextIteration
+	u.state.Details = make(map[string]interface{})
 
-	u.area = u.createArea(o.Width, o.Height)
+	u.area = createArea(o.Width, o.Height)
 	u.refreshView()
 	go u.mainLoop()
 	return &u
@@ -355,7 +361,7 @@ func (u *BaseUniverse) _nextIteration() (hasLiveEnitities bool, changed bool) {
 	u.area.Lock()
 	defer u.area.Unlock()
 	start := time.Now()
-	a := u.createArea(u.area.Width, u.area.Height)
+	a := createArea(u.area.Width, u.area.Height)
 	liveCellls := 0
 	u.walkArea(func(x int, y int, e Cell) {
 		nextState := u.cellNextState(x, y)
@@ -370,18 +376,6 @@ func (u *BaseUniverse) _nextIteration() (hasLiveEnitities bool, changed bool) {
 	u.state.LiveCells = liveCellls
 	u.state.IterationTime = time.Since(start)
 	return
-}
-
-//allocate the area and return the pointer
-func (u *BaseUniverse) createArea(width int, height int) Area {
-
-	area := Area{Width: width, Height: height, Entities: make([][]Cell, height)}
-	b := make([]Cell, width*height)
-	for i := range area.Entities {
-		start := width * i
-		area.Entities[i] = b[start : start+width : start+width]
-	}
-	return area
 }
 
 //walk the entire area and call the cb function for each cell
@@ -434,4 +428,16 @@ func (u *BaseUniverse) refreshView() {
 	for _, v := range u.views {
 		v.Refresh()
 	}
+}
+
+//allocate the area and return the pointer
+func createArea(width int, height int) Area {
+
+	area := Area{Width: width, Height: height, Entities: make([][]Cell, height)}
+	b := make([]Cell, width*height)
+	for i := range area.Entities {
+		start := width * i
+		area.Entities[i] = b[start : start+width : start+width]
+	}
+	return area
 }
